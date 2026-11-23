@@ -441,7 +441,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus
 
 .passage {
   font-size: 16px; margin-bottom: 30px; line-height: 1.72;
-  white-space: pre-wrap; max-height: 400px; overflow-y: auto;
+  white-space: pre-wrap; max-height: min(460px, 52vh); overflow-y: auto;
   color: var(--text-secondary);
   padding: calc(var(--bezel) + 22px);
 }

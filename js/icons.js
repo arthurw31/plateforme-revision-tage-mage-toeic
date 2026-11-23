@@ -24,6 +24,10 @@ const ICONS = {
   cards:     '<rect x="7.4" y="3.4" width="13.2" height="13.2" rx="3.2"/><path d="M16.6 20.6H8.2a4.4 4.4 0 0 1-4.4-4.4V7.8"/>',
   note:      '<rect x="4.6" y="3.4" width="14.8" height="17.2" rx="3.2"/><path d="M8.4 8.4h7.2M8.4 12.4h7.2M8.4 16.4h4"/>',
   doc:       '<path d="M13.6 3.4H7.2a2.6 2.6 0 0 0-2.6 2.6v12a2.6 2.6 0 0 0 2.6 2.6h9.6a2.6 2.6 0 0 0 2.6-2.6V9.4z"/><path d="M13.6 3.4v6h5.8"/>',
+  /* Deux feuillets décalés : les doubles textes de Part 7. */
+  docs:      '<path d="M8.4 2.8h5.2l4.4 4.4v8.4a2.2 2.2 0 0 1-2.2 2.2H8.4a2.2 2.2 0 0 1-2.2-2.2V5a2.2 2.2 0 0 1 2.2-2.2z"/><path d="M13.6 2.8v4.4h4.4"/><path d="M15.4 17.8v1.4a2.2 2.2 0 0 1-2.2 2.2H5.8a2.2 2.2 0 0 1-2.2-2.2V8.2a2.2 2.2 0 0 1 2.2-2.2h0.4"/>',
+  /* Trois feuillets empilés : les triples textes. */
+  layers:    '<path d="M12 2.8 2.9 7.2 12 11.6l9.1-4.4z"/><path d="M2.9 12.2 12 16.6l9.1-4.4"/><path d="M2.9 16.8 12 21.2l9.1-4.4"/>',
   cap:       '<path d="M2.6 8.6L12 4.4l9.4 4.2-9.4 4.2z"/><path d="M6.6 10.6v4.8c0 1.6 2.4 3 5.4 3s5.4-1.4 5.4-3v-4.8"/><path d="M21.4 8.6v6"/>',
   /* Roue dentée pleine (et non un cercle à rayons, qui se confondrait
      avec l'icône soleil de la bascule de thème à petite taille). */

@@ -78,7 +78,7 @@ const SPRINT = [
   { k: 6, label: 'J-6 · Grammaire', focus: 'Grammaire', sheet: 'part5', tasks: [
     'Lire la fiche méthode Grammaire (Parts 5 & 6)',
     'Deux séries de Part 5 — 40 questions en tout, 30 s par question',
-    'Les deux textes à trous de Part 6',
+    'Trois textes à trous de Part 6, dont un avec phrase à insérer',
     '15 flashcards'
   ] },
   { k: 5, label: 'J-5 · Écoute, Parts 1 & 2', focus: 'Listening', sheet: 'listening', tasks: [
@@ -95,8 +95,8 @@ const SPRINT = [
   ] },
   { k: 3, label: 'J-3 · Lecture', focus: 'Lecture', sheet: 'reading', tasks: [
     'Lire la fiche méthode Lecture — la technique « questions d\'abord »',
-    'Les deux textes de Part 7, chronométrés',
-    'Refaire la série de Part 5 que tu as le moins réussie',
+    'Série mixte de 20 questions, chronométrée à une minute par question',
+    'Au moins un double texte et un triple texte — ce sont les plus coûteux en temps',
     '15 flashcards'
   ] },
   { k: 2, label: 'J-2 · Test blanc', focus: 'Test blanc', tasks: [
@@ -637,6 +637,49 @@ function renderToeic() {
       <div class="card reveal"><span class="ic-lead">${ic('doc', 22)}</span><h3>Lecture</h3><p class="desc">La méthode « questions d'abord » et la gestion du temps en Part 7.</p><a class="btn small secondary" href="#/methode/toeic-reading">Lire la fiche</a></div>
     </div>
 
+    <h2>Compréhension écrite</h2>
+    <p class="sub" style="margin-bottom:22px">Part 7 compte <strong>54 questions sur 200</strong> — c'est la partie
+      la plus lourde de l'examen, et celle où le temps manque. Vise une minute par question et ne reviens
+      jamais en arrière. Les séries ci-dessous sont chronométrées à ce rythme.</p>
+    <div class="card reveal">
+      <span class="ic-lead">${ic('doc', 22)}</span>
+      <h3>Série mixte chronométrée</h3>
+      <p class="desc">Des documents tirés au hasard dans toute la banque, tous formats confondus — c'est
+        l'entraînement le plus proche de l'épreuve. Une minute par question.</p>
+      <div class="pill-row"><span class="badge mono">${countQ(READING_BANK)} questions en banque</span><span class="badge">${READING_BANK.length} documents</span></div>
+      <div class="pill-row">
+        <button class="btn small" onclick="startReadingDrill(10)">Série de 10</button>
+        <button class="btn small secondary" onclick="startReadingDrill(20)">Série de 20</button>
+      </div>
+    </div>
+    <div class="grid2">
+      ${[
+        { fmt: 'simple', icon: 'doc',  titre: 'Textes simples',
+          desc: "Un seul document : courriel, avis, article, publicité, facture, messagerie. Deux à quatre questions chacun." },
+        { fmt: 'double', icon: 'docs', titre: 'Doubles textes',
+          desc: "Deux documents à croiser — une annonce et la réponse qu'elle suscite. Au moins une question exige les deux." },
+        { fmt: 'triple', icon: 'layers', titre: 'Triples textes',
+          desc: "Trois documents liés. La bonne réponse est souvent dans le dernier, mais c'est le premier qui dit où chercher." }
+      ].map(g => {
+        const list = readingOf(g.fmt);
+        return `<div class="card reveal">
+          <span class="ic-lead">${ic(g.icon, 22)}</span>
+          <h3>${g.titre}</h3>
+          <p class="desc">${g.desc}</p>
+          <div class="pill-row"><span class="badge mono">${list.length} document${list.length > 1 ? 's' : ''} · ${countQ(list)} questions</span></div>
+          <div class="pill-row">${list.map(r => `<button class="btn small secondary" onclick="startToeicReading(${READING_BANK.indexOf(r)})">${esc(r.title)}</button>`).join('')}</div>
+        </div>`;
+      }).join('')}
+      <div class="card reveal">
+        <span class="ic-lead">${ic('pen', 22)}</span>
+        <h3>Part 6 — Textes à trous</h3>
+        <p class="desc">Quatre blancs par texte, dont <strong>une phrase entière à insérer</strong> : ce blanc-là
+          ne se résout pas par la grammaire, il faut suivre le fil du texte.</p>
+        <div class="pill-row"><span class="badge mono">${PART6_BANK.length} textes · ${countQ(PART6_BANK)} questions</span></div>
+        <div class="pill-row">${PART6_BANK.map((t, i) => `<button class="btn small secondary" onclick="startToeicPart6(${i})">${esc(t.title)}</button>`).join('')}</div>
+      </div>
+    </div>
+
     <h2>Entraînements</h2>
     <div class="grid2">
       <div class="card reveal">
@@ -661,12 +704,6 @@ function renderToeic() {
         ${cta('Lancer la série', 'startToeicGrammar()', 'small')}
       </div>
       <div class="card reveal">
-        <span class="ic-lead">${ic('doc', 22)}</span>
-        <h3>Part 7 — Lecture</h3>
-        <p class="desc">Textes professionnels — courriels, avis clients — avec questions de compréhension.</p>
-        <div class="pill-row">${TOEIC_READING.map((r, i) => `<button class="btn small secondary" onclick="startToeicReading(${i})">${esc(r.title)}</button>`).join('')}</div>
-      </div>
-      <div class="card reveal">
         <span class="ic-lead">${ic('headphones', 22)}</span>
         <h3>Part 2 — Question / réponse</h3>
         <p class="desc">Une question lue à voix haute, trois réponses. Choisis la bonne <em>sans lire les textes</em>, comme au vrai TOEIC.</p>
@@ -685,14 +722,27 @@ function renderToeic() {
         <p class="desc">Un court exposé — annonce, message vocal — lu à voix haute, puis trois questions de compréhension.</p>
         <div class="pill-row">${TOEIC_PART4.map((c, i) => `<button class="btn small secondary" onclick="startToeicPart4(${i})">${esc(c.title)}</button>`).join('')}</div>
       </div>
-      <div class="card reveal">
-        <span class="ic-lead">${ic('pen', 22)}</span>
-        <h3>Part 6 — Textes à trous</h3>
-        <p class="desc">Un texte professionnel avec plusieurs mots manquants : grammaire et cohérence en contexte.</p>
-        <div class="pill-row">${TOEIC_PART6.map((t, i) => `<button class="btn small secondary" onclick="startToeicPart6(${i})">${esc(t.title)}</button>`).join('')}</div>
-      </div>
     </div>`;
 }
+
+/* ---------------------- Compréhension écrite ----------------------
+   Part 7 pèse 54 questions sur 200 : c'est la partie la plus lourde de
+   l'examen. On regroupe ici les anciens textes et la banque étendue, en
+   distinguant les trois formats que l'examen mélange. */
+const READING_BANK = [
+  ...TOEIC_READING.map(r => ({ ...r, fmt: 'simple', type: r.type || 'Texte' })),
+  ...READING_SINGLE.map(r => ({ ...r, fmt: 'simple' })),
+  ...READING_DOUBLE.map(r => ({ ...r, fmt: 'double' })),
+  ...READING_TRIPLE.map(r => ({ ...r, fmt: 'triple' }))
+];
+const PART6_BANK = [...TOEIC_PART6, ...PART6_EXTRA];
+
+const readingOf = fmt => READING_BANK.filter(r => r.fmt === fmt);
+const countQ = list => list.reduce((n, r) => n + r.questions.length, 0);
+
+// Rythme réel : environ 60 s par question en Part 7. Les séries à plusieurs
+// documents laissent un peu plus de temps, la lecture y étant plus longue.
+const readingSeconds = r => r.questions.length * (r.fmt === 'simple' ? 60 : 70);
 
 function startToeicGrammar() {
   const pool = drawRandom(TOEIC_GRAMMAR, 20); // 30 s/question, comme au vrai TOEIC
@@ -703,11 +753,28 @@ function startToeicGrammar() {
 }
 
 function startToeicReading(i) {
-  const r = TOEIC_READING[i];
+  const r = READING_BANK[i];
   startQuiz({
     cat: 'toeic', module: 'reading', label: `TOEIC · Lecture — ${r.title}`,
     questions: r.questions.map(q => ({ ...q, passageText: r.passage })),
-    seconds: r.questions.length * 75, letters: 'ABCD', tmScore: false
+    seconds: readingSeconds(r), letters: 'ABCD', tmScore: false
+  });
+}
+
+// Série mixte : on tire des documents au hasard jusqu'à atteindre le nombre
+// de questions voulu. On tire des documents entiers, et non des questions
+// isolées, pour que chaque passage soit exploité comme au vrai examen.
+function startReadingDrill(n = 10) {
+  const pool = READING_BANK.slice().sort(() => Math.random() - 0.5);
+  const qs = [];
+  for (const r of pool) {
+    if (qs.length >= n) break;
+    qs.push(...r.questions.map(q => ({ ...q, passageText: r.passage, section: r.title })));
+  }
+  const picked = qs.slice(0, n);   // on s'en tient au nombre annoncé sur le bouton
+  startQuiz({
+    cat: 'toeic', module: 'reading', label: 'TOEIC · Lecture — série mixte',
+    questions: picked, seconds: picked.length * 60, letters: 'ABCD', tmScore: false
   });
 }
 
@@ -732,7 +799,7 @@ function startToeicPart4(i) {
 }
 
 function startToeicPart6(i) {
-  const t = TOEIC_PART6[i];
+  const t = PART6_BANK[i];
   startQuiz({
     cat: 'toeic', module: 'part6', label: `TOEIC · Part 6 — ${t.title}`,
     questions: t.questions.map(q => ({ ...q, passageText: t.passage })),
@@ -742,8 +809,10 @@ function startToeicPart6(i) {
 
 function startToeicMock() {
   // Mini test blanc Reading : Part 5 + Part 6 + Part 7, 45 s/question.
-  const p6 = TOEIC_PART6[Math.floor(Math.random() * TOEIC_PART6.length)];
-  const p7 = TOEIC_READING[Math.floor(Math.random() * TOEIC_READING.length)];
+  const p6 = PART6_BANK[Math.floor(Math.random() * PART6_BANK.length)];
+  // Un seul document en Part 7 : on évite les triples, trop longs pour 20 min.
+  const p7pool = READING_BANK.filter(r => r.fmt !== 'triple');
+  const p7 = p7pool[Math.floor(Math.random() * p7pool.length)];
   const qs = [
     ...drawRandom(TOEIC_GRAMMAR, 20).map(q => ({ ...q, section: 'Part 5' })),
     ...p6.questions.map(q => ({ ...q, passageText: p6.passage, section: 'Part 6' })),
@@ -761,7 +830,7 @@ function startToeicMock() {
 // réponse) pour éviter tout biais de position. Les Conditions minimales sont
 // exclues : leurs réponses A-E ont un sens fixe.
 function shuffleChoices(q) {
-  if (q.subtest === 'conditions') return q;
+  if (q.subtest === 'conditions' || q.fixed) return q;
   const order = q.choices.map((_, i) => i).sort(() => Math.random() - 0.5);
   return { ...q, choices: order.map(i => q.choices[i]), answer: order.indexOf(q.answer) };
 }
@@ -861,6 +930,16 @@ function renderQuizQuestion() {
       ${qz.questions.map((_, i) => `<button class="qdot ${qz.answers[i] !== null ? 'answered' : ''} ${i === qz.idx ? 'current' : ''}" onclick="jumpQuiz(${i})">${i + 1}</button>`).join('')}
     </div>
     </div>`;
+
+  // Le texte est réaffiché à chaque question. Sans cela, une série à deux ou
+  // trois documents obligerait à refaire défiler le passage depuis le début
+  // pour chacune des cinq questions.
+  const box = app().querySelector('.passage');
+  if (box) {
+    if (qz._passage === passage) box.scrollTop = qz._scroll || 0;
+    else { qz._passage = passage; qz._scroll = 0; }
+    box.addEventListener('scroll', () => { qz._scroll = box.scrollTop; }, { passive: true });
+  }
 }
 
 function answerQuiz(i) {
