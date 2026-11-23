@@ -276,7 +276,9 @@ async function tutorCallClaude() {
         body: JSON.stringify({ system: TUTOR_SYSTEM, messages: tutorState.messages })
       });
     } catch {
-      throw new Error('Impossible de joindre le serveur du tuteur — vérifie ta connexion internet.');
+      // Deux causes possibles : pas de réseau, ou le projet Supabase mis en
+      // veille par l'offre gratuite après une semaine sans utilisation.
+      throw new Error('Impossible de joindre le serveur du tuteur. Vérifie ta connexion internet ; si elle fonctionne, le serveur était en veille et se réveille en deux à trois minutes — réessaie dans un instant.');
     }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `Erreur du tuteur (${res.status}).`);

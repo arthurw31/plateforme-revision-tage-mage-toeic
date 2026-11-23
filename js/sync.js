@@ -165,11 +165,34 @@ async function syncSignup() {
   }
 }
 
+// Le serveur répond-il ? Sur l'offre gratuite, un projet Supabase sans aucune
+// requête pendant une semaine est mis en veille : l'authentification cesse
+// alors de répondre. Sans ce test, l'échec est muet et ressemble à une panne
+// de Google — alors qu'il suffit d'attendre le réveil du serveur.
+async function syncServerAwake() {
+  try {
+    const base = String(DB.settings.sbUrl).replace(/\/+$/, '');
+    const res = await fetch(`${base}/auth/v1/settings`, {
+      headers: { apikey: DB.settings.sbKey },
+      signal: AbortSignal.timeout(8000)
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+const SYNC_ASLEEP = "Le serveur de la plateforme est en veille (il se met en pause après une semaine sans utilisation). Il se réveille en deux à trois minutes : réessaie dans un instant.";
+
 // Connexion via Google (OAuth). Redirige vers Google puis revient sur l'app ;
 // supabase-js détecte la session dans l'URL au retour (detectSessionInUrl).
 async function syncLoginGoogle() {
   syncSaveProjectFields();
   if (!syncConfigured()) { syncMsg('Configuration Supabase manquante.'); return; }
+  syncMsg('Connexion au serveur…', true);
+  // Vérifié AVANT la redirection : une fois parti chez Google, un serveur
+  // endormi renvoie l'utilisateur sur une page d'erreur sans explication.
+  if (!(await syncServerAwake())) { syncMsg(SYNC_ASLEEP); return; }
   syncMsg('Redirection vers Google…', true);
   const { error } = await syncClient().auth.signInWithOAuth({
     provider: 'google',
@@ -185,7 +208,12 @@ async function syncLogin() {
   const pass = document.getElementById('sync-pass').value;
   syncMsg('Connexion…', true);
   const { data, error } = await syncClient().auth.signInWithPassword({ email, password: pass });
-  if (error) { syncMsg(error.message === 'Invalid login credentials' ? 'Email ou mot de passe incorrect.' : error.message); return; }
+  if (error) {
+    if (error.message === 'Invalid login credentials') { syncMsg('Email ou mot de passe incorrect.'); return; }
+    // Panne réseau ou serveur endormi : on distingue les deux pour l'utilisateur.
+    syncMsg((await syncServerAwake()) ? error.message : SYNC_ASLEEP);
+    return;
+  }
   syncState.user = data.user;
   await syncPull();
   refreshSettingsSyncSection();
