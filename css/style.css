@@ -1038,3 +1038,66 @@ details.card[open] > summary::after { transform: rotate(-135deg) translateY(-2px
   .t-shimmer::before { animation: none !important; }
   .t-toast { transition: none !important; }
 }
+
+/* ==========================================================================
+   Fiche de l'épreuve
+   ========================================================================== */
+
+/* Chiffres clés en tête de page */
+.figures { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; margin: 8px 0 20px; }
+@media (max-width: 760px) { .figures { grid-template-columns: 1fr 1fr; gap: 16px; } }
+.figure {
+  position: relative; isolation: isolate;
+  background: var(--shell); border: 1px solid var(--hairline);
+  border-radius: var(--r-out); padding: calc(var(--bezel) + 24px);
+  text-align: center;
+}
+.figure::before {
+  content: ""; position: absolute; inset: var(--bezel); z-index: -1;
+  border-radius: var(--r-in); background: var(--core); box-shadow: var(--inner-light);
+}
+.figure .v {
+  font-family: var(--font-mono); font-size: clamp(1.9rem, 3.4vw, 2.6rem);
+  font-weight: 400; letter-spacing: -0.045em; line-height: 1;
+  color: var(--series-toeic);
+}
+.figure .l {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.19em;
+  color: var(--muted); margin-top: 12px;
+}
+
+/* Frise du déroulé de la session */
+.timeline { position: relative; padding-left: 26px; }
+.timeline::before {
+  content: ""; position: absolute; left: 4px; top: 10px; bottom: 10px;
+  width: 1px; background: var(--grid);
+}
+.tl-step { position: relative; display: flex; gap: 26px; padding: 0 0 34px; }
+.tl-step:last-child { padding-bottom: 0; }
+.tl-step::before {
+  content: ""; position: absolute; left: -26px; top: 7px;
+  width: 9px; height: 9px; border-radius: 999px;
+  background: var(--core); border: 1.5px solid var(--series-toeic);
+}
+.tl-time {
+  flex: none; width: 76px; font-family: var(--font-mono); font-size: 13px;
+  color: var(--series-toeic); padding-top: 2px; font-variant-numeric: tabular-nums;
+}
+@media (max-width: 620px) {
+  .tl-step { flex-direction: column; gap: 6px; }
+  .tl-time { width: auto; }
+}
+.tl-body h3 { margin: 0 0 8px; font-size: 17px; }
+.tl-body p { margin: 0; color: var(--text-secondary); font-size: 15px; line-height: 1.65; max-width: 72ch; }
+
+/* Pièges de chaque partie */
+.exam-traps { margin: 4px 0 4px; }
+.exam-traps .lbl {
+  font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.21em;
+  color: var(--critical); margin-bottom: 10px;
+}
+.exam-traps ul, .exam-list { margin: 0; padding-left: 18px; }
+.exam-traps li, .exam-list li {
+  color: var(--text-secondary); font-size: 14.5px; line-height: 1.6; margin: 9px 0;
+}
+.exam-list li { font-size: 15px; }

@@ -53,41 +53,68 @@ function ensureSettings() {
   }
 }
 
-const TM_ORDER = ['calcul', 'logique', 'conditions', 'expression', 'raisonnement', 'comprehension'];
+// Rotation des compétences TOEIC sur la semaine. Chaque jour a un focus, le
+// vocabulaire revient tous les jours (c'est lui qui porte le score).
+const TOEIC_FOCUS = [
+  { id: 'grammaire', name: 'Grammaire', part: 'Parts 5 & 6' },
+  { id: 'listening', name: 'Listening', part: 'Parts 1 & 2' },
+  { id: 'lecture',   name: 'Lecture',   part: 'Part 7' },
+  { id: 'listening2', name: 'Listening', part: 'Parts 3 & 4' },
+  { id: 'grammaire2', name: 'Grammaire', part: 'Part 5' },
+  { id: 'mixte',     name: 'Révision',  part: 'toutes parties' }
+];
 
 function buildPlan() {
   ensureSettings();
   const { startDate, examDate } = DB.settings;
   const total = Math.max(7, daysBetween(startDate, examDate));
   const days = [];
-  let tmCount = 0, toCount = 0;
+  let work = 0;
   for (let i = 0; i < total; i++) {
     const date = addDays(startDate, i);
     const frac = i / total;
     const phase = frac < 0.35 ? 1 : frac < 0.72 ? 2 : 3;
-    let type, tasks;
+
     if (i % 7 === 6) {
-      type = 'rest';
-      tasks = ['Journée légère : flashcards de vocabulaire uniquement', 'Relire les erreurs de la semaine'];
-    } else if (i % 2 === 0) {
-      type = 'tm';
-      const st = TM_SUBTESTS.find(s => s.id === TM_ORDER[tmCount % TM_ORDER.length]);
-      tmCount++;
-      if (phase === 1) tasks = [`Découvrir la méthode : ${st.name}`, `Série ${st.name} (sans se soucier du chrono)`, '5 min de vocabulaire TOEIC'];
-      else if (phase === 2) tasks = [`Série chronométrée : ${st.name}`, 'Analyser chaque erreur (lire les explications)', '5 min de vocabulaire TOEIC'];
-      else tasks = (tmCount % 3 === 1)
-        ? ['Test blanc Tage Mage express (chronométré)', 'Analyser les erreurs', '5 min de vocabulaire TOEIC']
-        : [`Série chronométrée sur ton point faible`, 'Refaire les questions ratées de la semaine', '5 min de vocabulaire TOEIC'];
-    } else {
-      type = 'toeic';
-      toCount++;
-      if (phase === 1) tasks = ['10 nouvelles flashcards + révisions du jour', 'Série grammaire (Part 5)', 'Lire les explications de chaque erreur'];
-      else if (phase === 2) tasks = ['Flashcards du jour', (toCount % 2 === 0) ? 'Listening (Part 2)' : 'Série grammaire chronométrée', 'Un texte de lecture (Part 7)'];
-      else tasks = (toCount % 3 === 1)
-        ? ['Mini test blanc TOEIC (grammaire + lecture)', 'Listening (Part 2)', 'Flashcards du jour']
-        : ['Flashcards du jour', 'Listening (Part 2)', 'Revoir les règles de grammaire ratées'];
+      days.push({
+        date, phase, type: 'rest', focus: 'Repos actif',
+        tasks: ['Flashcards de vocabulaire uniquement', 'Relire les erreurs de la semaine']
+      });
+      continue;
     }
-    days.push({ date, type, phase, tasks });
+
+    const f = TOEIC_FOCUS[work % TOEIC_FOCUS.length];
+    work++;
+    let tasks;
+
+    if (phase === 1) {
+      // Découverte : on lit la méthode avant de s'entraîner, sans chrono.
+      const sheet = f.name === 'Listening' ? 'listening' : f.name === 'Lecture' ? 'reading' : 'part5';
+      tasks = [
+        `Lire la fiche méthode : ${f.name}`,
+        `Série ${f.name} (${f.part}), sans se soucier du chrono`,
+        '10 nouvelles flashcards + révisions du jour'
+      ];
+      if (i === 0) tasks.unshift("Lire la fiche de l'examen : format, durées, barème");
+      days.push({ date, phase, type: 'toeic', focus: f.name, sheet, tasks });
+      continue;
+    }
+
+    if (phase === 2) {
+      tasks = [
+        `Série chronométrée : ${f.name} (${f.part})`,
+        'Analyser chaque erreur en lisant les explications',
+        'Flashcards du jour'
+      ];
+      days.push({ date, phase, type: 'toeic', focus: f.name, tasks });
+      continue;
+    }
+
+    // Simulation : un test blanc tous les trois jours de travail.
+    tasks = (work % 3 === 1)
+      ? ['Mini test blanc Reading chronométré', 'Analyser les erreurs', 'Flashcards du jour']
+      : [`Série chronométrée : ${f.name} (${f.part})`, 'Refaire les questions ratées de la semaine', 'Flashcards du jour'];
+    days.push({ date, phase, type: 'toeic', focus: work % 3 === 1 ? 'Test blanc' : f.name, tasks });
   }
   return days;
 }
@@ -102,10 +129,13 @@ const ROUTES = {
   '': renderDashboard,
   'dashboard': renderDashboard,
   'plan': renderPlan,
-  'tagemage': renderTageMage,
   'toeic': renderToeic,
+  'examen': renderExam,
   'methode': renderMethode,
-  'stats': renderStats
+  'stats': renderStats,
+  // Conservée mais plus liée dans la navigation : la banque Tage Mage reste
+  // accessible par l'URL si la préparation reprend un jour.
+  'tagemage': renderTageMage
 };
 
 let activeQuiz = null; // guards timer cleanup on navigation
@@ -127,8 +157,8 @@ function navigate() {
 
 /* ============================== Dashboard ============================== */
 
-function sessionStats(cat) {
-  const s = DB.sessions.filter(x => x.cat === cat);
+function sessionStats(cat, modules) {
+  const s = DB.sessions.filter(x => x.cat === cat && (!modules || modules.includes(x.module)));
   const score = s.reduce((a, x) => a + x.score, 0);
   const total = s.reduce((a, x) => a + x.total, 0);
   return { n: s.length, pct: total ? Math.round(100 * score / total) : null };
@@ -150,7 +180,8 @@ function renderDashboard() {
   const daysLeft = Math.max(0, daysBetween(todayISO(), DB.settings.examDate));
   const days = buildPlan();
   const today = days.find(d => d.date === todayISO());
-  const tm = sessionStats('tm'), to = sessionStats('toeic');
+  const to = sessionStats('toeic');
+  const listen = sessionStats('toeic', ['listening', 'part1', 'part3', 'part4']);
   const prog = planProgress();
   const vocabSeen = Object.values(DB.srs).filter(c => c.reps > 0).length;
   const dueCount = srsQueue().length;
@@ -163,9 +194,9 @@ function renderDashboard() {
     <div class="hero reveal">
       <div class="hero-inner">
         <div>
-          <span class="eyebrow">${ic('target', 12)} Objectif Master</span>
+          <span class="eyebrow">${ic('globe', 12)} Objectif TOEIC</span>
           <h1>Bonjour.</h1>
-          <p class="sub">Tage Mage &amp; TOEIC le <strong>${fmtDate(DB.settings.examDate)}</strong>
+          <p class="sub">TOEIC Listening &amp; Reading le <strong>${fmtDate(DB.settings.examDate)}</strong>
             &nbsp;·&nbsp; <a href="javascript:openSettings()">Modifier la date</a></p>
         </div>
         <div class="hero-count">
@@ -177,8 +208,8 @@ function renderDashboard() {
 
     <div class="tiles">
       <div class="tile c-orange reveal"><div class="label">Plan suivi</div><div class="value">${prog.pct}%</div><div class="delta">${prog.done}/${prog.all} tâches à ce jour</div></div>
-      <div class="tile c-blue reveal"><div class="label">Précision Tage Mage</div><div class="value">${tm.pct === null ? '—' : tm.pct + '%'}</div><div class="delta">${tm.n} session${tm.n > 1 ? 's' : ''}</div></div>
-      <div class="tile c-green reveal"><div class="label">Précision TOEIC</div><div class="value">${to.pct === null ? '—' : to.pct + '%'}</div><div class="delta">${to.n} session${to.n > 1 ? 's' : ''}</div></div>
+      <div class="tile c-green reveal"><div class="label">Précision globale</div><div class="value">${to.pct === null ? '—' : to.pct + '%'}</div><div class="delta">${to.n} session${to.n > 1 ? 's' : ''}</div></div>
+      <div class="tile c-blue reveal"><div class="label">Listening</div><div class="value">${listen.pct === null ? '—' : listen.pct + '%'}</div><div class="delta">${listen.n} session${listen.n > 1 ? 's' : ''}</div></div>
       <div class="tile c-violet reveal"><div class="label">Vocabulaire</div><div class="value">${vocabSeen}</div><div class="delta">sur ${TOEIC_VOCAB.length} mots · ${dueCount} à réviser</div></div>
     </div>
 
@@ -186,7 +217,7 @@ function renderDashboard() {
       <div class="card b-7 reveal">
         <span class="ic-lead">${ic('calendar', 22)}</span>
         <h3>Session du jour</h3>
-        ${today ? `<div class="pill-row"><span class="badge">${today.type === 'tm' ? 'Tage Mage' : today.type === 'toeic' ? 'TOEIC' : 'Repos actif'}</span><span class="badge">${PHASE_NAMES[today.phase]}</span></div>` : ''}
+        ${today ? `<div class="pill-row"><span class="badge">${esc(today.focus || 'TOEIC')}</span><span class="badge">${PHASE_NAMES[today.phase]}</span></div>` : ''}
         ${today ? today.tasks.map((t, i) => {
           const done = !!(DB.plan[today.date] || [])[i];
           return taskCheck(t, done, `toggleTask('${today.date}',${i},${!done});renderDashboard()`);
@@ -211,7 +242,7 @@ function renderDashboard() {
         const allDone = doneN >= d.tasks.length;
         return `<a class="wday ${d.type} ${isToday ? 'today' : ''} reveal" href="#/plan">
           <div class="d">${esc(fmtDate(d.date))}</div>
-          <div class="t">${d.type === 'tm' ? 'Tage Mage' : d.type === 'toeic' ? 'TOEIC' : 'Repos'}</div>
+          <div class="t">${esc(d.focus || 'TOEIC')}</div>
           <div class="s ${allDone ? 'done' : ''}">${allDone ? 'terminé' : `${doneN}/${d.tasks.length}`}</div>
         </a>`;
       }).join('')}
@@ -219,10 +250,10 @@ function renderDashboard() {
 
     <h2>Accès rapide</h2>
     <div class="grid4">
-      ${tiltCard(`<div class="chip">${ic('cpu', 22)}</div><h3>Tage Mage</h3><p class="desc">Six sous-tests, séries chronométrées au format réel et corrections détaillées.</p>${cta("S'entraîner", '#/tagemage', 'small')}`, 'qc blue')}
-      ${tiltCard(`<div class="chip">${ic('globe', 22)}</div><h3>TOEIC</h3><p class="desc">Flashcards, grammaire, lecture et listening audio des sept parties.</p>${cta("S'entraîner", '#/toeic', 'small')}`, 'qc green')}
+      ${tiltCard(`<div class="chip">${ic('globe', 22)}</div><h3>S'entraîner</h3><p class="desc">Flashcards, grammaire, lecture et listening audio des sept parties.</p>${cta('Ouvrir', '#/toeic', 'small')}`, 'qc green')}
+      ${tiltCard(`<div class="chip">${ic('doc', 22)}</div><h3>L'épreuve</h3><p class="desc">Format, durées, barème et pièges de chacune des sept parties.</p>${cta('Lire la fiche', '#/examen', 'small')}`, 'qc blue')}
       ${tiltCard(`<div class="chip">${ic('flag', 22)}</div><h3>Plan de révision</h3><p class="desc">Programme jour par jour jusqu'à l'examen, en trois phases.</p>${cta('Voir le plan', '#/plan', 'small')}`, 'qc orange')}
-      ${tiltCard(`<div class="chip">${ic('chart', 22)}</div><h3>Progression</h3><p class="desc">Historique des scores et points faibles par sous-test.</p>${cta('Voir les stats', '#/stats', 'small')}`, 'qc violet')}
+      ${tiltCard(`<div class="chip">${ic('chart', 22)}</div><h3>Progression</h3><p class="desc">Historique des scores et points faibles par partie.</p>${cta('Voir les stats', '#/stats', 'small')}`, 'qc violet')}
     </div>`;
 }
 
@@ -270,8 +301,9 @@ function renderPlan() {
   app().innerHTML = `
     <span class="eyebrow">${ic('flag', 12)} Six semaines</span>
     <h1>Plan de révision</h1>
-    <p class="sub">Du ${fmtDate(DB.settings.startDate)} au ${fmtDate(DB.settings.examDate)}. Jours pairs TOEIC,
-      jours impairs Tage Mage, un jour léger par semaine.
+    <p class="sub">Du ${fmtDate(DB.settings.startDate)} au ${fmtDate(DB.settings.examDate)}. Une compétence
+      différente chaque jour — grammaire, listening, lecture — du vocabulaire tous les jours,
+      et une journée légère par semaine.
       <a href="javascript:openSettings()">Modifier les dates</a></p>
     <div class="meter"><div class="mlabel"><span>Tâches accomplies jusqu'à aujourd'hui</span><span class="val">${prog.pct}%</span></div>
       <div class="track"><div class="fill" style="width:${prog.pct}%"></div></div></div>
@@ -285,7 +317,7 @@ function renderPlan() {
             const checks = DB.plan[d.date] || [];
             return `<div class="day ${isToday ? 'today' : ''} ${isPast ? 'past' : ''}">
               <div class="dhead"><span class="dnum">${fmtDate(d.date)}</span>
-                <span class="dtype ${d.type}">${d.type === 'tm' ? 'TM' : d.type === 'toeic' ? 'TOEIC' : 'Repos'}</span></div>
+                <span class="dtype ${d.type}">${esc(d.focus || 'TOEIC')}</span></div>
               ${d.tasks.map((t, i) => `<label class="${checks[i] ? 'done' : ''}">
                 <input type="checkbox" ${checks[i] ? 'checked' : ''} onchange="toggleTask('${d.date}',${i},this.checked)">
                 <span>${esc(t)}</span></label>`).join('')}
@@ -380,6 +412,74 @@ function startTMExpress() {
     cat: 'tm', module: 'mock', label: 'Tage Mage · Test blanc express',
     questions: qs, seconds: qs.length * 80, letters: 'ABCDE', tmScore: true
   });
+}
+
+/* ============================== Fiche de l'examen ============================== */
+
+function renderExam() {
+  const lis = EXAM.parts.filter(p => p.section === 'listening');
+  const rea = EXAM.parts.filter(p => p.section === 'reading');
+  const partCard = p => `
+    <div class="card reveal">
+      <span class="ic-lead">${ic(p.icon, 22)}</span>
+      <h3>${esc(p.name)}</h3>
+      <div class="pill-row">
+        <span class="badge mono">${p.q} questions</span>
+        <span class="badge">${p.choices} choix</span>
+      </div>
+      <p class="desc">${esc(p.what)}</p>
+      <div class="exam-traps">
+        <div class="lbl">Les pièges</div>
+        <ul>${p.traps.map(t => `<li>${esc(t)}</li>`).join('')}</ul>
+      </div>
+      <div class="expl">${ic('bulb', 15)}${esc(p.tip)}</div>
+    </div>`;
+
+  app().innerHTML = `
+    <span class="eyebrow">${ic('doc', 12)} Tout savoir</span>
+    <h1>L'épreuve TOEIC</h1>
+    <p class="sub">TOEIC Listening &amp; Reading, le format standard sur papier. Deux sections, sept parties,
+      deux heures de test effectif. Voici exactement ce qui t'attend et comment chaque partie se joue.</p>
+
+    <div class="figures">
+      ${EXAM.keyFigures.map(f => `<div class="figure reveal"><div class="v">${esc(f.v)}</div><div class="l">${esc(f.l)}</div></div>`).join('')}
+    </div>
+
+    <h2>Le déroulé d'une session</h2>
+    <div class="timeline">
+      ${EXAM.timeline.map(s => `<div class="tl-step reveal">
+        <div class="tl-time">${esc(s.t) || '—'}</div>
+        <div class="tl-body"><h3>${esc(s.h)}</h3><p>${esc(s.d)}</p></div>
+      </div>`).join('')}
+    </div>
+
+    <h2>Section Listening — 45 min, 100 questions</h2>
+    <p class="sub">L'audio ne passe qu'une fois et ne s'arrête jamais. Le rythme t'est imposé :
+      la seule marge de manœuvre, c'est de savoir à l'avance quoi écouter.</p>
+    <div class="grid2">${lis.map(partCard).join('')}</div>
+
+    <h2>Section Reading — 75 min, 100 questions</h2>
+    <p class="sub">Ici le temps est à toi : tu répartis les 75 minutes comme tu veux entre les trois parties
+      et tu peux revenir en arrière. Viser 10 min sur la Part 5 et 8 min sur la Part 6 laisse
+      presque une minute par question pour la Part 7, la plus longue.</p>
+    <div class="grid2">${rea.map(partCard).join('')}</div>
+
+    <h2>Comment le score est calculé</h2>
+    <div class="grid2">
+      ${EXAM.scoring.map(s => `<div class="card reveal"><h3>${esc(s.h)}</h3><p class="desc" style="margin:0">${esc(s.d)}</p></div>`).join('')}
+    </div>
+
+    <h2>Le jour J</h2>
+    <div class="card reveal">
+      <span class="ic-lead">${ic('clock', 22)}</span>
+      <h3>À prévoir avant de partir</h3>
+      <ul class="exam-list">${EXAM.practical.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+    </div>
+
+    <div class="quiz-nav">
+      ${cta("S'entraîner maintenant", '#/toeic')}
+      <a class="btn secondary" href="#/plan">Voir mon plan</a>
+    </div>`;
 }
 
 /* ============================== Fiches méthode ============================== */
@@ -1036,16 +1136,26 @@ const SERIES = {
 
 function renderStats() {
   ensureSettings();
-  const tm = sessionStats('tm'), to = sessionStats('toeic');
+  const to = sessionStats('toeic');
+  const listen = sessionStats('toeic', ['listening', 'part1', 'part3', 'part4']);
   const daysLeft = Math.max(0, daysBetween(todayISO(), DB.settings.examDate));
   const sessions = DB.sessions;
 
-  // Moyenne par sous-test Tage Mage
-  const bySub = TM_SUBTESTS.map(s => {
-    const runs = sessions.filter(x => x.cat === 'tm' && x.module === s.id);
+  // Précision par partie de l'examen, pour repérer les points faibles.
+  const MODULES = [
+    { id: 'part1', name: 'Part 1 — Photos' },
+    { id: 'listening', name: 'Part 2 — Question / réponse' },
+    { id: 'part3', name: 'Part 3 — Conversations' },
+    { id: 'part4', name: 'Part 4 — Exposés' },
+    { id: 'grammar', name: 'Part 5 — Grammaire' },
+    { id: 'part6', name: 'Part 6 — Textes à trous' },
+    { id: 'reading', name: 'Part 7 — Lecture' }
+  ];
+  const bySub = MODULES.map(m => {
+    const runs = sessions.filter(x => x.cat === 'toeic' && x.module === m.id);
     const score = runs.reduce((a, x) => a + x.score, 0);
     const total = runs.reduce((a, x) => a + x.total, 0);
-    return { name: s.name, pct: total ? Math.round(100 * score / total) : null, n: runs.length };
+    return { name: m.name, pct: total ? Math.round(100 * score / total) : null, n: runs.length };
   });
 
   app().innerHTML = `
@@ -1054,17 +1164,13 @@ function renderStats() {
     <div class="tiles">
       <div class="tile c-orange reveal"><div class="label">Jours restants</div><div class="value">${daysLeft}</div></div>
       <div class="tile c-violet reveal"><div class="label">Sessions faites</div><div class="value">${sessions.length}</div></div>
-      <div class="tile c-blue reveal"><div class="label">Précision Tage Mage</div><div class="value">${tm.pct === null ? '—' : tm.pct + '%'}</div><div class="delta">${tm.n} session${tm.n > 1 ? 's' : ''}</div></div>
-      <div class="tile c-green reveal"><div class="label">Précision TOEIC</div><div class="value">${to.pct === null ? '—' : to.pct + '%'}</div><div class="delta">${to.n} session${to.n > 1 ? 's' : ''}</div></div>
+      <div class="tile c-green reveal"><div class="label">Précision globale</div><div class="value">${to.pct === null ? '—' : to.pct + '%'}</div><div class="delta">${to.n} session${to.n > 1 ? 's' : ''}</div></div>
+      <div class="tile c-blue reveal"><div class="label">Listening</div><div class="value">${listen.pct === null ? '—' : listen.pct + '%'}</div><div class="delta">${listen.n} session${listen.n > 1 ? 's' : ''}</div></div>
     </div>
 
     <h2>Historique des scores</h2>
     <div class="card">
       ${sessions.length < 2 ? `<div class="empty">Fais au moins deux sessions pour voir ta courbe de progression.</div>` : `
-        <div class="chart-legend">
-          <span class="key"><span class="swatch" style="background:${SERIES.tm.color}"></span>Tage Mage</span>
-          <span class="key"><span class="swatch" style="background:${SERIES.toeic.color}"></span>TOEIC</span>
-        </div>
         <div class="chart-wrap" id="history-chart"></div>
         <button class="btn small secondary" style="margin-top:10px" onclick="document.getElementById('data-table').style.display = document.getElementById('data-table').style.display === 'none' ? 'block' : 'none'">Afficher / masquer le tableau</button>
         <div id="data-table" style="display:none">
@@ -1079,14 +1185,15 @@ function renderStats() {
         </div>`}
     </div>
 
-    <h2>Précision par sous-test Tage Mage</h2>
+    <h2>Précision par partie</h2>
     <div class="card">
-      ${bySub.every(s => s.pct === null) ? `<div class="empty">Lance des séries Tage Mage pour identifier tes points faibles.</div>`
+      ${bySub.every(s => s.pct === null) ? `<div class="empty">Lance quelques séries pour identifier tes points faibles partie par partie.</div>`
       : `<div id="subtest-chart"></div>
-         <p class="desc" style="margin-top:8px">Concentre tes prochaines séries sur les barres les plus courtes.</p>`}
+         <p class="desc" style="margin-top:14px">Concentre tes prochaines séries sur les barres les plus courtes.</p>`}
     </div>
 
     <div class="quiz-nav">
+      ${cta("S'entraîner", '#/toeic')}
       <button class="btn secondary" onclick="openSettings()">Paramètres</button>
     </div>`;
 
@@ -1267,7 +1374,7 @@ new MutationObserver(() => motionInit()).observe(document.getElementById('app'),
 
 // Chrome de l'application (marque, engrenage) — icônes, pas d'emojis.
 document.getElementById('brand').innerHTML =
-  `${ic('target', 17)}<span>Prépa <span class="tm">Tage&nbsp;Mage</span> · <span class="to">TOEIC</span></span>`;
+  `${ic('target', 17)}<span>Prépa <span class="to">TOEIC</span></span>`;
 document.getElementById('settings-btn').innerHTML = ic('gear', 17);
 themeApply(themeCurrent());
 

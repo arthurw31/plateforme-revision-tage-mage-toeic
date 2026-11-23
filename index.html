@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Prépa Tage Mage & TOEIC</title>
-  <meta name="description" content="Plateforme de révision Tage Mage et TOEIC : séries chronométrées, flashcards à répétition espacée, listening audio, plan de révision et suivi de progression.">
+  <title>Prépa TOEIC</title>
+  <meta name="description" content="Plateforme de révision TOEIC : fiche complète de l'épreuve, séries chronométrées des sept parties, flashcards à répétition espacée, listening audio, plan de révision et suivi de progression.">
   <meta name="theme-color" content="#faf9f7">
   <meta name="color-scheme" content="light dark">
   <!-- Appliqué avant le premier rendu : évite le flash de thème au chargement. -->
@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@300;400;500&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=12">
+  <link rel="stylesheet" href="css/style.css?v=13">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2333499e' stroke-width='1.5'><circle cx='12' cy='12' r='8.5'/><circle cx='12' cy='12' r='4.2'/><circle cx='12' cy='12' r='1' fill='%2333499e'/></svg>">
 </head>
 <body>
@@ -36,8 +36,8 @@
     <span class="brand" id="brand"></span>
     <a class="navlink" href="#/dashboard">Accueil</a>
     <a class="navlink" href="#/plan">Plan</a>
-    <a class="navlink" href="#/tagemage">Tage Mage</a>
-    <a class="navlink" href="#/toeic">TOEIC</a>
+    <a class="navlink" href="#/toeic">S'entraîner</a>
+    <a class="navlink" href="#/examen">L'épreuve</a>
     <a class="navlink" href="#/stats">Progression</a>
     <span class="spacer"></span>
     <span id="sync-badge"></span>
@@ -54,6 +54,7 @@
   <script src="js/data-toeic-extra.js"></script>
   <script src="js/data-vocab.js"></script>
   <script src="js/data-methods.js"></script>
+  <script src="js/data-exam.js"></script>
   <script src="js/app.js"></script>
   <script src="js/tutor.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
