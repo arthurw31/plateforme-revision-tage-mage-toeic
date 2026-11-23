@@ -64,10 +64,92 @@ const TOEIC_FOCUS = [
   { id: 'mixte',     name: 'Révision',  part: 'toutes parties' }
 ];
 
+// Sprint de dernière semaine, décrit À REBOURS depuis le jour J : « k » est le
+// nombre de jours restants avant l'examen. La veille est donc toujours allégée
+// et le test blanc tombe toujours à J-2, même si l'élève s'y prend à J-4.
+// Chaque journée vaut une heure et demie à deux heures.
+const SPRINT = [
+  { k: 7, label: 'J-7 · État des lieux', focus: 'Diagnostic', tasks: [
+    "Lire la fiche de l'épreuve : 200 questions, 45 min d'écoute puis 75 min de lecture, barème",
+    'Mini test blanc Reading chronométré — ce score est ton point de départ',
+    'Noter le score Reading estimé pour le comparer à J-2',
+    '20 flashcards de vocabulaire'
+  ] },
+  { k: 6, label: 'J-6 · Grammaire', focus: 'Grammaire', sheet: 'part5', tasks: [
+    'Lire la fiche méthode Grammaire (Parts 5 & 6)',
+    'Deux séries de Part 5 — 40 questions en tout, 30 s par question',
+    'Les deux textes à trous de Part 6',
+    '15 flashcards'
+  ] },
+  { k: 5, label: 'J-5 · Écoute, Parts 1 & 2', focus: 'Listening', sheet: 'listening', tasks: [
+    'Lire la fiche méthode Listening',
+    'Série Part 1 — les six photos',
+    'Série Part 2 — les douze questions/réponses, sans jamais lire les textes',
+    '15 flashcards'
+  ] },
+  { k: 4, label: 'J-4 · Écoute, Parts 3 & 4', focus: 'Listening', tasks: [
+    'Les trois conversations de Part 3',
+    'Les deux exposés de Part 4',
+    'Réécouter une seule fois ce que tu as raté, puis passer',
+    '15 flashcards'
+  ] },
+  { k: 3, label: 'J-3 · Lecture', focus: 'Lecture', sheet: 'reading', tasks: [
+    'Lire la fiche méthode Lecture — la technique « questions d\'abord »',
+    'Les deux textes de Part 7, chronométrés',
+    'Refaire la série de Part 5 que tu as le moins réussie',
+    '15 flashcards'
+  ] },
+  { k: 2, label: 'J-2 · Test blanc', focus: 'Test blanc', tasks: [
+    "Test blanc complet de 2 h dans les conditions réelles — l'app n'en contient pas, prends-en un chez ETS ou dans un livre",
+    "À défaut : mini test blanc Reading puis toutes les parties d'écoute d'affilée, sans pause",
+    'Analyser chaque erreur en lisant les explications',
+    'Comparer le score à celui de J-7'
+  ] },
+  { k: 1, label: 'J-1 · Allègement', focus: 'Allègement', tasks: [
+    'Relire les trois fiches méthode — rien de nouveau aujourd\'hui',
+    'Refaire uniquement les questions ratées cette semaine',
+    '10 flashcards, pas plus',
+    "Préparer pièce d'identité et convocation, vérifier l'heure et le lieu",
+    'Se coucher tôt : le listening se joue sur la concentration'
+  ] }
+];
+
+// Le plan long (six semaines) n'a pas de sens à une semaine de l'examen : sous
+// dix jours on bascule sur le sprint, construit à rebours depuis le jour J.
+function buildSprintPlan(startDate, total) {
+  const days = [];
+  for (let i = 0; i < total; i++) {
+    const date = addDays(startDate, i);
+    const left = total - i;                 // jours restants avant le jour J
+    if (left > SPRINT.length) {
+      // Un peu plus de dix jours : on bachote avant d'entrer dans le sprint.
+      const f = TOEIC_FOCUS[i % TOEIC_FOCUS.length];
+      days.push({
+        date, phase: 1, phaseLabel: `J-${left} · Bachotage`, type: 'toeic', focus: f.name,
+        tasks: [`Série chronométrée : ${f.name} (${f.part})`, 'Analyser chaque erreur', '15 flashcards']
+      });
+      continue;
+    }
+    const s = SPRINT[SPRINT.length - left];
+    days.push({
+      date, phase: left <= 2 ? 3 : left >= 6 ? 1 : 2, phaseLabel: s.label,
+      type: 'toeic', focus: s.focus, sheet: s.sheet, tasks: s.tasks.slice()
+    });
+  }
+  return days;
+}
+
+// Le libellé de phase : celui du sprint s'il existe, sinon la phase du plan long.
+function phaseName(day) {
+  return day.phaseLabel || PHASE_NAMES[day.phase];
+}
+
 function buildPlan() {
   ensureSettings();
   const { startDate, examDate } = DB.settings;
-  const total = Math.max(7, daysBetween(startDate, examDate));
+  const horizon = daysBetween(startDate, examDate);
+  if (horizon <= 10) return buildSprintPlan(startDate, Math.max(1, horizon));
+  const total = Math.max(7, horizon);
   const days = [];
   let work = 0;
   for (let i = 0; i < total; i++) {
@@ -217,7 +299,7 @@ function renderDashboard() {
       <div class="card b-7 reveal">
         <span class="ic-lead">${ic('calendar', 22)}</span>
         <h3>Session du jour</h3>
-        ${today ? `<div class="pill-row"><span class="badge">${esc(today.focus || 'TOEIC')}</span><span class="badge">${PHASE_NAMES[today.phase]}</span></div>` : ''}
+        ${today ? `<div class="pill-row"><span class="badge">${esc(today.focus || 'TOEIC')}</span><span class="badge">${phaseName(today)}</span></div>` : ''}
         ${today ? today.tasks.map((t, i) => {
           const done = !!(DB.plan[today.date] || [])[i];
           return taskCheck(t, done, `toggleTask('${today.date}',${i},${!done});renderDashboard()`);
@@ -294,22 +376,30 @@ function toggleTask(date, i, val) {
 function renderPlan() {
   ensureSettings();
   const days = buildPlan();
+  const sprint = days.some(d => d.phaseLabel);   // mode dernière semaine
   const weeks = [];
   for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
   const prog = planProgress();
+  const left = Math.max(0, daysBetween(todayISO(), DB.settings.examDate));
 
   app().innerHTML = `
-    <span class="eyebrow">${ic('flag', 12)} Six semaines</span>
-    <h1>Plan de révision</h1>
-    <p class="sub">Du ${fmtDate(DB.settings.startDate)} au ${fmtDate(DB.settings.examDate)}. Une compétence
-      différente chaque jour — grammaire, listening, lecture — du vocabulaire tous les jours,
-      et une journée légère par semaine.
+    <span class="eyebrow">${ic('flag', 12)} ${sprint
+      ? (left > 0 ? `Plus que ${left} jour${left > 1 ? 's' : ''}` : "C'est le jour J")
+      : 'Six semaines'}</span>
+    <h1>${sprint ? 'Sprint final' : 'Plan de révision'}</h1>
+    <p class="sub">${sprint
+      ? `Jusqu'au ${fmtDate(DB.settings.examDate)}&nbsp;· construit à rebours depuis le jour J :
+         une compétence par jour, le test blanc à J-2, la veille allégée.
+         Compte une heure et demie à deux heures par journée.`
+      : `Du ${fmtDate(DB.settings.startDate)} au ${fmtDate(DB.settings.examDate)}. Une compétence
+         différente chaque jour — grammaire, listening, lecture — du vocabulaire tous les jours,
+         et une journée légère par semaine.`}
       <a href="javascript:openSettings()">Modifier les dates</a></p>
     <div class="meter"><div class="mlabel"><span>Tâches accomplies jusqu'à aujourd'hui</span><span class="val">${prog.pct}%</span></div>
       <div class="track"><div class="fill" style="width:${prog.pct}%"></div></div></div>
     ${weeks.map((w, wi) => `
       <div class="week reveal">
-        <h3>Semaine ${wi + 1}<span class="phase-tag">${PHASE_NAMES[w[0].phase]}</span></h3>
+        <h3>${sprint ? 'Dernière ligne droite' : 'Semaine ' + (wi + 1)}<span class="phase-tag">${sprint ? `${w.length} jour${w.length > 1 ? 's' : ''} avant le jour J` : PHASE_NAMES[w[0].phase]}</span></h3>
         <div class="days">
           ${w.map(d => {
             const isToday = d.date === todayISO();
@@ -1296,6 +1386,11 @@ function openSettings() {
         <input type="date" id="set-start" value="${DB.settings.startDate}">
         <label>Date de l'examen</label>
         <input type="date" id="set-exam" value="${DB.settings.examDate}">
+        <div class="pill-row" style="margin:-6px 0 4px">
+          <button class="btn small secondary" onclick="presetExam(7)">Dans 7 jours</button>
+          <button class="btn small secondary" onclick="presetExam(14)">Dans 2 semaines</button>
+          <button class="btn small secondary" onclick="presetExam(45)">Dans 6 semaines</button>
+        </div>
         <label>Nouveaux mots par jour</label>
         <input type="number" id="set-new" min="1" max="40" value="${DB.settings.newPerDay}">
         <div id="sync-section">${typeof syncSettingsHTML === 'function' ? syncSettingsHTML() : ''}</div>
@@ -1309,6 +1404,15 @@ function openSettings() {
   div.addEventListener('click', closeSettings);
   document.body.appendChild(div);
 }
+// Raccourci : place l'examen dans n jours et repart d'aujourd'hui. Sous dix
+// jours, le plan bascule automatiquement sur le sprint de dernière semaine.
+function presetExam(n) {
+  const start = document.getElementById('set-start');
+  const exam = document.getElementById('set-exam');
+  if (start) start.value = todayISO();
+  if (exam) exam.value = addDays(todayISO(), n);
+}
+
 function closeSettings() {
   const m = document.getElementById('settings-modal');
   if (m) m.remove();
