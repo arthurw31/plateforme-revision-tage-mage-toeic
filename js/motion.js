@@ -124,6 +124,20 @@ function navPillSync() {
   pill.style.width = r.width + 'px';
   pill.style.transform = `translateX(${r.left - b.left + bar.scrollLeft}px)`;
   pill.classList.add('ready');
+
+  // Avec six onglets, la barre déborde sur petit écran : on ramène l'onglet
+  // actif dans le champ, sinon on ne voit pas où l'on se trouve.
+  if (bar.scrollWidth > bar.clientWidth + 1) {
+    const gauche = r.left - b.left + bar.scrollLeft;
+    const marge = 16;
+    const visibleMin = bar.scrollLeft + marge;
+    const visibleMax = bar.scrollLeft + bar.clientWidth - marge;
+    if (gauche < visibleMin || gauche + r.width > visibleMax) {
+      const cible = gauche - (bar.clientWidth - r.width) / 2;
+      const doux = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+      bar.scrollTo({ left: Math.max(0, cible), behavior: doux ? 'smooth' : 'auto' });
+    }
+  }
 }
 
 window.addEventListener('resize', navPillSync);

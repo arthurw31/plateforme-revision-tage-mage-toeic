@@ -211,7 +211,10 @@ const ROUTES = {
   '': renderDashboard,
   'dashboard': renderDashboard,
   'plan': renderPlan,
-  'toeic': renderToeic,
+  'oral': renderOral,
+  'ecrit': renderEcrit,
+  // Ancienne route unique, conservée pour les liens déjà partagés.
+  'toeic': () => { location.hash = '#/ecrit'; },
   'examen': renderExam,
   'methode': renderMethode,
   'stats': renderStats,
@@ -311,7 +314,7 @@ function renderDashboard() {
         <p class="desc">${dueCount > 0
           ? `<strong>${dueCount}</strong> carte${dueCount > 1 ? 's' : ''} à réviser aujourd'hui. La régularité fait tout en répétition espacée.`
           : `Aucune carte en attente. Lance quand même une session pour découvrir de nouveaux mots.`}</p>
-        ${cta('Lancer les flashcards', '#/toeic', 'small')}
+        ${cta('Lancer les flashcards', 'startFlashcards()', 'small')}
       </div>
     </div>
 
@@ -332,9 +335,9 @@ function renderDashboard() {
 
     <h2>Accès rapide</h2>
     <div class="grid4">
-      ${tiltCard(`<div class="chip">${ic('globe', 22)}</div><h3>S'entraîner</h3><p class="desc">Flashcards, grammaire, lecture et listening audio des sept parties.</p>${cta('Ouvrir', '#/toeic', 'small')}`, 'qc green')}
-      ${tiltCard(`<div class="chip">${ic('doc', 22)}</div><h3>L'épreuve</h3><p class="desc">Format, durées, barème et pièges de chacune des sept parties.</p>${cta('Lire la fiche', '#/examen', 'small')}`, 'qc blue')}
-      ${tiltCard(`<div class="chip">${ic('flag', 22)}</div><h3>Plan de révision</h3><p class="desc">Programme jour par jour jusqu'à l'examen, en trois phases.</p>${cta('Voir le plan', '#/plan', 'small')}`, 'qc orange')}
+      ${tiltCard(`<div class="chip">${ic('headphones', 22)}</div><h3>Compréhension orale</h3><p class="desc">Parts 1 à 4 — photos, questions/réponses, conversations et exposés audio.</p>${cta('Ouvrir', '#/oral', 'small')}`, 'qc green')}
+      ${tiltCard(`<div class="chip">${ic('doc', 22)}</div><h3>Compréhension écrite</h3><p class="desc">Parts 5 à 7 — grammaire, textes à trous et les trois formats de lecture.</p>${cta('Ouvrir', '#/ecrit', 'small')}`, 'qc blue')}
+      ${tiltCard(`<div class="chip">${ic('flag', 22)}</div><h3>Plan de révision</h3><p class="desc">Programme jour par jour jusqu'à l'examen.</p>${cta('Voir le plan', '#/plan', 'small')}`, 'qc orange')}
       ${tiltCard(`<div class="chip">${ic('chart', 22)}</div><h3>Progression</h3><p class="desc">Historique des scores et points faibles par partie.</p>${cta('Voir les stats', '#/stats', 'small')}`, 'qc violet')}
     </div>`;
 }
@@ -587,7 +590,8 @@ function renderExam() {
     </div>
 
     <div class="quiz-nav">
-      ${cta("S'entraîner maintenant", '#/toeic')}
+      ${cta("Travailler l'écoute", '#/oral')}
+      <a class="btn secondary" href="#/ecrit">Travailler la lecture</a>
       <a class="btn secondary" href="#/plan">Voir mon plan</a>
     </div>`;
 }
@@ -612,7 +616,8 @@ function renderMethode() {
         </ul>
       </div>`).join('')}
       <div class="quiz-nav">
-        ${isTM ? cta("S'entraîner maintenant", `startTMSubtest('${id}')`) : cta("S'entraîner maintenant", '#/toeic')}
+        ${isTM ? cta("S'entraîner maintenant", `startTMSubtest('${id}')`)
+                : cta("S'entraîner maintenant", id === 'toeic-listening' ? '#/oral' : '#/ecrit')}
         <a class="btn secondary" href="#/${m.back}">Retour</a>
       </div>
     </div>`;
@@ -620,47 +625,148 @@ function renderMethode() {
 
 /* ============================== TOEIC ============================== */
 
-function renderToeic() {
+// Onglet d'entraînement courant, pour que « Retour » ramène là d'où l'on vient.
+let lastTrainingTab = '#/oral';
+const trainingHome = () => lastTrainingTab;
+
+// Le vocabulaire porte le score des DEUX sections : la carte figure donc sur
+// les deux onglets, sur la même file de révision.
+function vocabCard() {
   const due = srsQueue().length;
+  return `<div class="card reveal">
+    <span class="ic-lead">${ic('cards', 22)}</span>
+    <h3>Vocabulaire — flashcards</h3>
+    <p class="desc">Répétition espacée : les mots reviennent au bon moment pour être mémorisés
+      durablement. Ils comptent autant à l'écoute qu'à la lecture — c'est la seule rubrique
+      commune aux deux onglets.</p>
+    <div class="pill-row"><span class="badge mono">${TOEIC_VOCAB.length} mots</span><span class="badge">${due} aujourd'hui</span></div>
+    ${cta(`Réviser (${due})`, 'startFlashcards()', 'small')}
+  </div>`;
+}
+
+// Renvoi vers l'autre onglet, en bas de page.
+function otherTabCard(vers) {
+  const o = vers === 'oral'
+    ? { href: '#/oral', icon: 'headphones', t: 'Compréhension orale', d: "Parts 1 à 4 — 45 minutes, 100 questions. L'audio ne passe qu'une fois." }
+    : { href: '#/ecrit', icon: 'doc', t: 'Compréhension écrite', d: 'Parts 5 à 7 — 75 minutes, 100 questions. Le temps est à toi, à condition de le tenir.' };
+  return `<div class="card reveal" style="margin-top:28px">
+    <span class="ic-lead">${ic(o.icon, 22)}</span>
+    <h3>${o.t}</h3>
+    <p class="desc">${o.d}</p>
+    ${cta("Passer à l'autre section", o.href, 'small')}
+  </div>`;
+}
+
+function renderOral() {
+  lastTrainingTab = '#/oral';
+  const lHist = DB.sessions.filter(x => x.cat === 'toeic' && ['part1', 'listening', 'part3', 'part4'].includes(x.module));
+  const lBest = lHist.length ? Math.max(...lHist.map(h => Math.round(100 * h.score / h.total))) : null;
+  app().innerHTML = `
+    <span class="eyebrow">${ic('headphones', 12)} Section Listening</span>
+    <h1>Compréhension orale</h1>
+    <p class="sub"><strong>100 questions en 45 minutes</strong>, soit la moitié du score. L'enregistrement
+      défile en continu : tu ne peux ni revenir en arrière, ni mettre en pause. La seule marge de
+      manœuvre, c'est de savoir à l'avance quoi écouter.
+      ${lBest !== null ? `Ton meilleur score à l'écoute&nbsp;: <strong>${lBest}%</strong>.` : ''}</p>
+
+    <div class="card reveal">
+      <span class="ic-lead">${ic('headphones', 22)}</span>
+      <h3>Fiche méthode — Listening</h3>
+      <p class="desc">Quoi écouter avant même que l'audio commence, partie par partie. À lire une fois
+        avant de lancer les séries ci-dessous.</p>
+      <a class="btn small secondary" href="#/methode/toeic-listening">Lire la fiche</a>
+    </div>
+
+    <h2>Les quatre parties</h2>
+    <div class="grid2">
+      <div class="card reveal">
+        <span class="ic-lead">${ic('image', 22)}</span>
+        <h3>Part 1 — Photos</h3>
+        <p class="desc">Une scène est décrite, puis quatre phrases sont lues en anglais. Choisis celle
+          qui décrit le mieux l'image, sans texte affiché.</p>
+        <div class="pill-row"><span class="badge mono">${TOEIC_PART1.length} photos · 5 min</span><span class="badge">6 questions au vrai TOEIC</span></div>
+        ${cta('Lancer la série', 'startToeicPart1()', 'small')}
+      </div>
+      <div class="card reveal">
+        <span class="ic-lead">${ic('headphones', 22)}</span>
+        <h3>Part 2 — Question / réponse</h3>
+        <p class="desc">Une question lue à voix haute, trois réponses. Choisis la bonne <em>sans lire
+          les textes</em>, comme au vrai TOEIC. C'est la seule partie à trois choix.</p>
+        <div class="pill-row"><span class="badge mono">${TOEIC_LISTENING.length} items · 8 min</span><span class="badge">25 questions au vrai TOEIC</span></div>
+        ${cta("Lancer l'écoute", 'startListening()', 'small')}
+      </div>
+      <div class="card reveal">
+        <span class="ic-lead">${ic('headphones', 22)}</span>
+        <h3>Part 3 — Conversations</h3>
+        <p class="desc">Une conversation entre deux personnes est lue à voix haute, puis trois questions.
+          Le texte n'est jamais affiché.</p>
+        <div class="pill-row"><span class="badge mono">${TOEIC_PART3.length} conversations</span><span class="badge">39 questions au vrai TOEIC</span></div>
+        <div class="pill-row">${TOEIC_PART3.map((c, i) => `<button class="btn small secondary" onclick="startToeicPart3(${i})">${esc(c.title)}</button>`).join('')}</div>
+      </div>
+      <div class="card reveal">
+        <span class="ic-lead">${ic('volume', 22)}</span>
+        <h3>Part 4 — Exposés</h3>
+        <p class="desc">Un court exposé — annonce, message vocal — lu à voix haute, puis trois questions
+          de compréhension. Même principe que la Part 3, mais une seule voix.</p>
+        <div class="pill-row"><span class="badge mono">${TOEIC_PART4.length} exposés</span><span class="badge">30 questions au vrai TOEIC</span></div>
+        <div class="pill-row">${TOEIC_PART4.map((c, i) => `<button class="btn small secondary" onclick="startToeicPart4(${i})">${esc(c.title)}</button>`).join('')}</div>
+      </div>
+    </div>
+
+    <h2>Tous les jours</h2>
+    ${vocabCard()}
+
+    ${otherTabCard('ecrit')}`;
+}
+
+function renderEcrit() {
+  lastTrainingTab = '#/ecrit';
   const gHist = DB.sessions.filter(x => x.cat === 'toeic' && x.module === 'grammar');
   const gBest = gHist.length ? Math.max(...gHist.map(h => Math.round(100 * h.score / h.total))) : null;
   app().innerHTML = `
-    <span class="eyebrow">${ic('globe', 12)} Listening &amp; Reading</span>
-    <h1>TOEIC</h1>
-    <p class="sub">Deux cents questions, deux heures, score de <strong>10 à 990</strong>. Il se construit surtout sur le vocabulaire — tous les jours — et sur les automatismes de grammaire et d'écoute.</p>
-    <details class="card reveal" style="margin-bottom:26px">
-      <summary>${ic('doc', 15)} Structure réelle de l'examen — les sept parties</summary>
-      <div style="overflow-x:auto"><table class="datatable" style="margin-top:10px">
-        <tr><th>Épreuve</th><th>Partie</th><th>Questions</th></tr>
-        <tr><td>Listening — 45 min, 100 q</td><td>Part 1 — Photos</td><td>6</td></tr>
-        <tr><td></td><td>Part 2 — Question / réponse</td><td>25</td></tr>
-        <tr><td></td><td>Part 3 — Conversations</td><td>39</td></tr>
-        <tr><td></td><td>Part 4 — Courts exposés</td><td>30</td></tr>
-        <tr><td>Reading — 75 min, 100 q</td><td>Part 5 — Phrases à trous</td><td>30</td></tr>
-        <tr><td></td><td>Part 6 — Textes à compléter</td><td>16</td></tr>
-        <tr><td></td><td>Part 7 — Compréhension de textes</td><td>54</td></tr>
-      </table></div>
-      <p class="desc" style="margin:18px 0 0">Astuce vérifiée : en Reading, si deux réponses sont synonymes, élimine-les toutes les deux — il ne peut y avoir qu'une bonne réponse.</p>
-    </details>
+    <span class="eyebrow">${ic('doc', 12)} Section Reading</span>
+    <h1>Compréhension écrite</h1>
+    <p class="sub"><strong>100 questions en 75 minutes</strong>, l'autre moitié du score. Ici le temps est
+      à toi : tu le répartis comme tu veux entre les trois parties et tu peux revenir en arrière.
+      Viser 10 min sur la Part 5 et 8 min sur la Part 6 laisse presque une minute par question pour
+      la Part 7, la plus longue.</p>
+
     <div class="card reveal">
       <span class="ic-lead">${ic('flag', 22)}</span>
       <h3>Mini test blanc Reading</h3>
-      <p class="desc">Part 5, 6 et 7 mélangées, quarante-cinq secondes par question comme le jour J, avec score Reading estimé sur 495.</p>
+      <p class="desc">Parts 5, 6 et 7 mélangées, quarante-cinq secondes par question comme le jour J,
+        avec score Reading estimé sur 495.</p>
       <div class="pill-row"><span class="badge mono">27 questions · 20 min</span></div>
       ${cta('Lancer le test blanc', 'startToeicMock()', 'small')}
     </div>
 
     <h2>Fiches méthode</h2>
-    <div class="grid3">
-      <div class="card reveal"><span class="ic-lead">${ic('note', 22)}</span><h3>Grammaire</h3><p class="desc">Les cinq types de questions des Parts 5 et 6, et le bon réflexe pour chacun.</p><a class="btn small secondary" href="#/methode/toeic-part5">Lire la fiche</a></div>
-      <div class="card reveal"><span class="ic-lead">${ic('headphones', 22)}</span><h3>Listening</h3><p class="desc">Quoi écouter avant même que l'audio commence, partie par partie.</p><a class="btn small secondary" href="#/methode/toeic-listening">Lire la fiche</a></div>
-      <div class="card reveal"><span class="ic-lead">${ic('doc', 22)}</span><h3>Lecture</h3><p class="desc">La méthode « questions d'abord » et la gestion du temps en Part 7.</p><a class="btn small secondary" href="#/methode/toeic-reading">Lire la fiche</a></div>
+    <div class="grid2">
+      <div class="card reveal"><span class="ic-lead">${ic('note', 22)}</span><h3>Grammaire</h3>
+        <p class="desc">Les cinq types de questions des Parts 5 et 6, et le bon réflexe pour chacun.</p>
+        <a class="btn small secondary" href="#/methode/toeic-part5">Lire la fiche</a></div>
+      <div class="card reveal"><span class="ic-lead">${ic('doc', 22)}</span><h3>Lecture</h3>
+        <p class="desc">La méthode « questions d'abord » et la gestion du temps en Part 7.</p>
+        <a class="btn small secondary" href="#/methode/toeic-reading">Lire la fiche</a></div>
     </div>
 
-    <h2>Compréhension écrite</h2>
-    <p class="sub" style="margin-bottom:22px">Part 7 compte <strong>54 questions sur 200</strong> — c'est la partie
-      la plus lourde de l'examen, et celle où le temps manque. Vise une minute par question et ne reviens
-      jamais en arrière. Les séries ci-dessous sont chronométrées à ce rythme.</p>
+    <h2>Part 5 — Grammaire</h2>
+    <div class="grid2">
+      <div class="card reveal">
+        <span class="ic-lead">${ic('note', 22)}</span>
+        <h3>Phrases à compléter</h3>
+        <p class="desc">Trente secondes par question comme le jour J. Chaque erreur est expliquée.
+          C'est la partie la plus rapide à traiter, et celle qui se travaille le mieux.</p>
+        <div class="pill-row"><span class="badge mono">20 questions · 10 min</span><span class="badge">banque de ${TOEIC_GRAMMAR.length}</span>${gBest !== null ? `<span class="badge">Record ${gBest}%</span>` : ''}</div>
+        ${cta('Lancer la série', 'startToeicGrammar()', 'small')}
+      </div>
+      ${vocabCard()}
+    </div>
+
+    <h2>Parts 6 et 7 — Lecture</h2>
+    <p class="sub" style="margin-bottom:22px">Part 7 compte à elle seule <strong>54 questions sur 200</strong> —
+      la partie la plus lourde de l'examen, et celle où le temps manque. Vise une minute par question
+      et ne reviens jamais en arrière. Les séries ci-dessous sont chronométrées à ce rythme.</p>
     <div class="card reveal">
       <span class="ic-lead">${ic('doc', 22)}</span>
       <h3>Série mixte chronométrée</h3>
@@ -700,49 +806,7 @@ function renderToeic() {
       </div>
     </div>
 
-    <h2>Entraînements</h2>
-    <div class="grid2">
-      <div class="card reveal">
-        <span class="ic-lead">${ic('image', 22)}</span>
-        <h3>Part 1 — Photos</h3>
-        <p class="desc">Une scène est décrite, puis quatre phrases sont lues en anglais. Choisis celle qui décrit le mieux l'image, sans texte affiché.</p>
-        <div class="pill-row"><span class="badge mono">${TOEIC_PART1.length} photos · 5 min</span></div>
-        ${cta('Lancer la série', 'startToeicPart1()', 'small')}
-      </div>
-      <div class="card reveal">
-        <span class="ic-lead">${ic('cards', 22)}</span>
-        <h3>Vocabulaire — flashcards</h3>
-        <p class="desc">Répétition espacée : les mots reviennent au bon moment pour être mémorisés durablement. Chaque jour, même cinq minutes.</p>
-        <div class="pill-row"><span class="badge mono">${TOEIC_VOCAB.length} mots</span><span class="badge">${due} aujourd'hui</span></div>
-        ${cta(`Réviser (${due})`, 'startFlashcards()', 'small')}
-      </div>
-      <div class="card reveal">
-        <span class="ic-lead">${ic('note', 22)}</span>
-        <h3>Part 5 — Grammaire</h3>
-        <p class="desc">Phrases à compléter, trente secondes par question comme le jour J. Chaque erreur est expliquée.</p>
-        <div class="pill-row"><span class="badge mono">20 questions · 10 min</span><span class="badge">banque de ${TOEIC_GRAMMAR.length}</span>${gBest !== null ? `<span class="badge">Record ${gBest}%</span>` : ''}</div>
-        ${cta('Lancer la série', 'startToeicGrammar()', 'small')}
-      </div>
-      <div class="card reveal">
-        <span class="ic-lead">${ic('headphones', 22)}</span>
-        <h3>Part 2 — Question / réponse</h3>
-        <p class="desc">Une question lue à voix haute, trois réponses. Choisis la bonne <em>sans lire les textes</em>, comme au vrai TOEIC.</p>
-        <div class="pill-row"><span class="badge mono">${TOEIC_LISTENING.length} items · 8 min</span></div>
-        ${cta("Lancer l'écoute", 'startListening()', 'small')}
-      </div>
-      <div class="card reveal">
-        <span class="ic-lead">${ic('headphones', 22)}</span>
-        <h3>Part 3 — Conversations</h3>
-        <p class="desc">Une conversation entre deux personnes est lue à voix haute, puis trois questions. Le texte n'est jamais affiché.</p>
-        <div class="pill-row">${TOEIC_PART3.map((c, i) => `<button class="btn small secondary" onclick="startToeicPart3(${i})">${esc(c.title)}</button>`).join('')}</div>
-      </div>
-      <div class="card reveal">
-        <span class="ic-lead">${ic('volume', 22)}</span>
-        <h3>Part 4 — Exposés</h3>
-        <p class="desc">Un court exposé — annonce, message vocal — lu à voix haute, puis trois questions de compréhension.</p>
-        <div class="pill-row">${TOEIC_PART4.map((c, i) => `<button class="btn small secondary" onclick="startToeicPart4(${i})">${esc(c.title)}</button>`).join('')}</div>
-      </div>
-    </div>`;
+    ${otherTabCard('oral')}`;
 }
 
 /* ---------------------- Compréhension écrite ----------------------
@@ -922,7 +986,7 @@ function renderQuizQuestion() {
         <div class="qcount">Question ${qz.idx + 1} / ${qz.questions.length}</div></div>
       <div style="display:flex;gap:10px;align-items:center">
         <span class="timer" id="quiz-timer">${fmtTime(qz.remaining)}</span>
-        <button class="btn small secondary" onclick="if(confirm('Abandonner cette série ? Rien ne sera enregistré.')){location.hash='#/${qz.cat === 'tm' ? 'tagemage' : 'toeic'}'}">Quitter</button>
+        <button class="btn small secondary" onclick="if(confirm('Abandonner cette série ? Rien ne sera enregistré.')){location.hash='${qz.cat === 'tm' ? '#/tagemage' : trainingHome()}'}">Quitter</button>
       </div>
     </div>
     ${qz.intro && qz.idx === 0 ? `<div class="expl" style="margin-bottom:26px">${esc(qz.intro)}</div>` : ''}
@@ -1039,7 +1103,7 @@ function finishQuiz() {
       }).join('')}
     </div>
     <div class="quiz-nav">
-      ${cta('Retour aux entraînements', `#/${qz.cat === 'tm' ? 'tagemage' : 'toeic'}`)}
+      ${cta('Retour aux entraînements', qz.cat === 'tm' ? '#/tagemage' : trainingHome())}
       <a class="btn secondary" href="#/stats">Voir ma progression</a>
     </div>`;
   activeQuiz = null;
@@ -1072,7 +1136,7 @@ function startFlashcards() {
   const queue = srsQueue();
   if (!queue.length) {
     app().innerHTML = `<h1>Flashcards</h1><div class="card empty">Rien à réviser aujourd'hui.<br>Reviens demain — la répétition espacée fait le reste.</div>
-      <a class="btn secondary" href="#/toeic">Retour</a>`;
+      <a class="btn secondary" href="${trainingHome()}">Retour</a>`;
     return;
   }
   fcSession = { queue, pos: 0, flipped: false, done: 0 };
@@ -1084,7 +1148,7 @@ function renderFlashcard() {
   if (s.pos >= s.queue.length) {
     app().innerHTML = `<h1>Flashcards</h1>
       <div class="card empty">Session terminée — ${s.done} carte${s.done > 1 ? 's' : ''} révisée${s.done > 1 ? 's' : ''}.<br>À demain.</div>
-      ${cta('Retour au TOEIC', '#/toeic')}`;
+      ${cta("Retour à l'entraînement", trainingHome())}`;
     fcSession = null;
     return;
   }
@@ -1095,7 +1159,7 @@ function renderFlashcard() {
     <div class="quiz-shell">
     <div class="quiz-head">
       <div><strong>Flashcards TOEIC</strong><div class="qcount">Carte ${s.pos + 1} / ${s.queue.length}${st.reps === 0 ? ' · nouveau mot' : ''}</div></div>
-      <a class="btn small secondary" href="#/toeic">Quitter</a>
+      <a class="btn small secondary" href="${trainingHome()}">Quitter</a>
     </div>
     <div class="flashcard" onclick="flipCard()">
       <div class="word">${esc(c.w)}</div>
@@ -1175,7 +1239,7 @@ function renderListening() {
       <div class="tiles">
         <div class="tile c-green reveal"><div class="label">Score</div><div class="value">${s.score}/${TOEIC_LISTENING.length}</div><div class="delta ${pct >= 60 ? 'up' : 'down'}">${pct}%</div></div>
       </div>
-      <div class="quiz-nav">${cta('Retour au TOEIC', '#/toeic')}<a class="btn secondary" href="#/stats">Voir ma progression</a></div>`;
+      <div class="quiz-nav">${cta("Retour à l'entraînement", trainingHome())}<a class="btn secondary" href="#/stats">Voir ma progression</a></div>`;
     listenSession = null;
     return;
   }
@@ -1184,7 +1248,7 @@ function renderListening() {
     <div class="quiz-shell">
     <div class="quiz-head">
       <div><strong>TOEIC · Listening Part 2</strong><div class="qcount">Item ${s.idx + 1} / ${TOEIC_LISTENING.length} · score ${s.score}</div></div>
-      <a class="btn small secondary" href="#/toeic">Quitter</a>
+      <a class="btn small secondary" href="${trainingHome()}">Quitter</a>
     </div>
     <div class="card listen-box">
       <button class="bigplay" onclick="playListenItem()">Réécouter<span class="btn-ic">${ic('play', 14)}</span></button>
@@ -1257,7 +1321,7 @@ function renderPart1() {
       <div class="tiles">
         <div class="tile c-green reveal"><div class="label">Score</div><div class="value">${s.score}/${TOEIC_PART1.length}</div><div class="delta ${pct >= 60 ? 'up' : 'down'}">${pct}%</div></div>
       </div>
-      <div class="quiz-nav">${cta('Retour au TOEIC', '#/toeic')}<a class="btn secondary" href="#/stats">Voir ma progression</a></div>`;
+      <div class="quiz-nav">${cta("Retour à l'entraînement", trainingHome())}<a class="btn secondary" href="#/stats">Voir ma progression</a></div>`;
     p1Session = null;
     return;
   }
@@ -1266,7 +1330,7 @@ function renderPart1() {
     <div class="quiz-shell">
     <div class="quiz-head">
       <div><strong>TOEIC · Listening Part 1</strong><div class="qcount">Photo ${s.idx + 1} / ${TOEIC_PART1.length} · score ${s.score}</div></div>
-      <a class="btn small secondary" href="#/toeic">Quitter</a>
+      <a class="btn small secondary" href="${trainingHome()}">Quitter</a>
     </div>
     <div class="scene-card">
       <div class="lbl">${ic('image', 13)} La photo montre</div>
@@ -1327,6 +1391,10 @@ function renderStats() {
   ensureSettings();
   const to = sessionStats('toeic');
   const listen = sessionStats('toeic', ['listening', 'part1', 'part3', 'part4']);
+  const read = sessionStats('toeic', ['grammar', 'part6', 'reading', 'mock']);
+  // On renvoie vers la section la plus faible ; à égalité, ou sans historique,
+  // vers l'écoute, qui ne se rattrape pas en dernière minute.
+  const weakest = (listen.pct !== null && read.pct !== null && read.pct < listen.pct) ? '#/ecrit' : '#/oral';
   const daysLeft = Math.max(0, daysBetween(todayISO(), DB.settings.examDate));
   const sessions = DB.sessions;
 
@@ -1382,7 +1450,7 @@ function renderStats() {
     </div>
 
     <div class="quiz-nav">
-      ${cta("S'entraîner", '#/toeic')}
+      ${cta("S'entraîner", weakest)}
       <button class="btn secondary" onclick="openSettings()">Paramètres</button>
     </div>`;
 
