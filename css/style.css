@@ -29,7 +29,7 @@
   /* Texte */
   --text-primary: #16161a;
   --text-secondary: rgba(22, 22, 26, 0.62);
-  --muted: rgba(22, 22, 26, 0.44);
+  --muted: rgba(22, 22, 26, 0.58);   /* 0.44 échouait le contraste AA sur blanc */
   --grid: rgba(22, 22, 26, 0.09);
   --baseline: rgba(22, 22, 26, 0.17);
   --border: var(--hairline);
@@ -37,6 +37,7 @@
   /* Les deux seules teintes de marque */
   --series-tm: #33499e;         /* bleu d'encre — Tage Mage */
   --series-toeic: #b4712a;      /* ambre — TOEIC */
+  --toeic-ink: #8a5415;      /* ambre foncé, pour le petit texte (6.2:1) */
   --seq-250: #9aa6d0;
   --good: #2f6e4b;
   --good-text: #2f6e4b;
@@ -88,12 +89,13 @@
 
   --text-primary: rgba(255, 255, 255, 0.93);
   --text-secondary: rgba(255, 255, 255, 0.60);
-  --muted: rgba(255, 255, 255, 0.42);
+  --muted: rgba(255, 255, 255, 0.52);
   --grid: rgba(255, 255, 255, 0.09);
   --baseline: rgba(255, 255, 255, 0.16);
 
   --series-tm: #8b9ef0;         /* bleu d'encre éclairci */
   --series-toeic: #e0a45e;      /* ambre éclairci */
+  --toeic-ink: #e0a45e;
   --seq-250: #3a4570;
   --good: #62b98a;
   --good-text: #62b98a;
@@ -1062,8 +1064,8 @@ details.card[open] > summary::after { transform: rotate(-135deg) translateY(-2px
   color: var(--series-toeic);
 }
 .figure .l {
-  font-size: 10px; text-transform: uppercase; letter-spacing: 0.19em;
-  color: var(--muted); margin-top: 12px;
+  font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.14em;
+  color: var(--text-secondary); margin-top: 12px; font-weight: 500;
 }
 
 /* Frise du déroulé de la session */
@@ -1080,24 +1082,89 @@ details.card[open] > summary::after { transform: rotate(-135deg) translateY(-2px
   background: var(--core); border: 1.5px solid var(--series-toeic);
 }
 .tl-time {
-  flex: none; width: 76px; font-family: var(--font-mono); font-size: 13px;
-  color: var(--series-toeic); padding-top: 2px; font-variant-numeric: tabular-nums;
+  flex: none; width: 76px; font-family: var(--font-mono); font-size: 13.5px;
+  color: var(--toeic-ink); padding-top: 2px; font-variant-numeric: tabular-nums;
 }
 @media (max-width: 620px) {
   .tl-step { flex-direction: column; gap: 6px; }
   .tl-time { width: auto; }
 }
 .tl-body h3 { margin: 0 0 8px; font-size: 17px; }
-.tl-body p { margin: 0; color: var(--text-secondary); font-size: 15px; line-height: 1.65; max-width: 72ch; }
+.tl-body p { margin: 0; color: var(--text-primary); opacity: 0.82; font-size: 15.5px; line-height: 1.68; max-width: 72ch; }
 
 /* Pièges de chaque partie */
 .exam-traps { margin: 4px 0 4px; }
 .exam-traps .lbl {
-  font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.21em;
-  color: var(--critical); margin-bottom: 10px;
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em;
+  color: var(--critical); margin-bottom: 10px; font-weight: 600;
 }
 .exam-traps ul, .exam-list { margin: 0; padding-left: 18px; }
 .exam-traps li, .exam-list li {
-  color: var(--text-secondary); font-size: 14.5px; line-height: 1.6; margin: 9px 0;
+  color: var(--text-primary); opacity: 0.80;
+  font-size: 15px; line-height: 1.62; margin: 10px 0;
 }
-.exam-list li { font-size: 15px; }
+.exam-traps li::marker, .exam-list li::marker { color: var(--toeic-ink); }
+.exam-list li { font-size: 15.5px; }
+
+/* ---------- Exemple travaillé, sur chaque partie de la fiche ----------
+   Le bloc doit se détacher nettement de la carte qui le porte : c'est le
+   seul endroit de la fiche où l'on lit de l'anglais, et il faut distinguer
+   d'un coup d'œil ce qui est LU à voix haute de ce qui est IMPRIMÉ. */
+.exam-ex {
+  margin: 20px 0 6px;
+  background: var(--void);
+  border: 1px solid var(--hairline-strong);
+  border-radius: 20px;
+  padding: 20px 22px 18px;
+}
+:root[data-theme="dark"] .exam-ex { background: rgba(255, 255, 255, 0.045); }
+.exam-ex .ex-head {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em;
+  font-weight: 600; color: var(--toeic-ink); margin-bottom: 16px;
+}
+.exam-ex .ex-head .ic { color: var(--toeic-ink); }
+.ex-doc { margin-bottom: 14px; }
+.ex-role {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--text-secondary); font-weight: 500; margin-bottom: 7px;
+}
+.ex-script {
+  white-space: pre-wrap; font-size: 15px; line-height: 1.6;
+  color: var(--text-primary);
+  border-left: 2px solid var(--hairline-strong); padding-left: 14px;
+}
+.ex-prompt {
+  font-weight: 600; font-size: 15.5px; line-height: 1.45;
+  color: var(--text-primary); margin: 14px 0 10px;
+}
+.ex-choices { list-style: none; margin: 10px 0 0; padding: 0; }
+.ex-choices li {
+  display: flex; align-items: flex-start; gap: 9px;
+  font-size: 15px; line-height: 1.5; padding: 7px 10px;
+  color: var(--text-primary); opacity: 0.78;
+  border-radius: 10px;
+}
+.ex-choices li .ex-mark { flex: none; width: 15px; display: inline-flex; padding-top: 2px; }
+/* La bonne réponse : couleur ET icône, pour rester lisible sans la couleur. */
+.ex-choices li.ok {
+  opacity: 1; font-weight: 550;
+  color: var(--good-text); background: rgba(47, 110, 75, 0.10);
+}
+:root[data-theme="dark"] .ex-choices li.ok { background: rgba(98, 185, 138, 0.14); }
+.ex-choices li.ok .ic { color: var(--good-text); }
+.ex-why {
+  margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--hairline);
+  font-size: 14.5px; line-height: 1.62; color: var(--text-primary); opacity: 0.82;
+}
+.ex-why strong { opacity: 1; font-weight: 600; }
+
+@media (max-width: 620px) {
+  .exam-ex { padding: 17px 16px 15px; border-radius: 17px; }
+  .ex-script, .ex-choices li { font-size: 14.5px; }
+}
+@media (prefers-contrast: more) {
+  .exam-ex { border-color: var(--text-primary); }
+  .ex-script { border-left-color: var(--text-primary); }
+  .tl-body p, .exam-traps li, .exam-list li, .ex-choices li, .ex-why { opacity: 1; }
+}

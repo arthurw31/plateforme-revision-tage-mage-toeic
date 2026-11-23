@@ -506,6 +506,25 @@ function startTMExpress() {
 
 /* ============================== Fiche de l'examen ============================== */
 
+function examExample(e) {
+  const bloc = (label, texte) => texte
+    ? `<div class="ex-doc"><div class="ex-role">${esc(label)}</div><div class="ex-script">${esc(texte)}</div></div>`
+    : '';
+  return `
+    <div class="exam-ex">
+      <div class="ex-head">${ic('bulb', 14)} Exemple</div>
+      ${bloc("Ce que tu entends — rien n'est écrit", e.heard)}
+      ${bloc('Ce qui est imprimé dans le livret', e.printed)}
+      ${e.prompt ? `<div class="ex-prompt">${esc(e.prompt)}</div>` : ''}
+      <div class="ex-role" style="margin-top:14px">Les réponses proposées</div>
+      <ul class="ex-choices">
+        ${e.choices.map((c, i) => `<li class="${i === e.answer ? 'ok' : ''}">
+          <span class="ex-mark">${i === e.answer ? ic('check', 13) : ''}</span>${esc(c)}</li>`).join('')}
+      </ul>
+      <div class="ex-why"><strong>Pourquoi&nbsp;:</strong> ${esc(e.why)}</div>
+    </div>`;
+}
+
 function renderExam() {
   const lis = EXAM.parts.filter(p => p.section === 'listening');
   const rea = EXAM.parts.filter(p => p.section === 'reading');
@@ -518,6 +537,7 @@ function renderExam() {
         <span class="badge">${p.choices} choix</span>
       </div>
       <p class="desc">${esc(p.what)}</p>
+      ${p.example ? examExample(p.example) : ''}
       <div class="exam-traps">
         <div class="lbl">Les pièges</div>
         <ul>${p.traps.map(t => `<li>${esc(t)}</li>`).join('')}</ul>
